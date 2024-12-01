@@ -54,3 +54,12 @@ II. Package content:
 
     Surya modified the code by adding Heart Rate calculation  and some 
     additional comments. Contact: p.surya1994@gmail.com  
+
+    Thanks p.surya1994@gmail.com for giving a meaningful project about ECG developement
+    The file is updated with more ideal from our groups (Luong, Luan, Phong)
+    We have reworked with files for more effiency in team work and changes for better understanding in general
+    It includes about detect medical condition of persion related to R peak 
+      + First, It is Atrial Fibrillation
+      + We also update more data for testing
+      + There are more added aglorithm to detect other cases of R peak.
+
