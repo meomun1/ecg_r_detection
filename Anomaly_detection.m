@@ -83,7 +83,7 @@ for i = 1:length(testLoss)
     end
 end
 
-% Display classification results
+%  classification 
 for i = 1:length(classifications)
     switch classifications(i)
         case 1
@@ -110,3 +110,4 @@ ylabel('Density');
 title('Test Loss Distribution and Thresholds');
 legend('Test Loss', 'Mean', 'Normal', 'Arrhythmia', 'AFib');
 grid on;
+ 
