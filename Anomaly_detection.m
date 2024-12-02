@@ -1,13 +1,15 @@
-% Load the dataset
-data = readtable('ecg.csv', 'ReadVariableNames', false);
-data = table2array(data);
-labels = data(:, end); % Extract labels
-features = data(:, 1:end-1); % Extract features
+% Load the ECG data
+load('ecgdemodata1.mat');
+load('ecgdemodata2.mat');
+
+% Combine both datasets
+data = [val1'; val2'];
+labels = [ones(size(val1, 2), 1); zeros(size(val2, 2), 1)]; % Assume val1 is normal (1), val2 is abnormal (0)
 
 % Normalize the data
-minVal = min(features, [], 'all');
-maxVal = max(features, [], 'all');
-features = (features - minVal) / (maxVal - minVal);
+minVal = min(data, [], 'all');
+maxVal = max(data, [], 'all');
+features = (data - minVal) / (maxVal - minVal);
 
 % Split data into training and testing sets
 cv = cvpartition(labels, 'HoldOut', 0.2);
@@ -16,13 +18,10 @@ testData = features(test(cv), :);
 trainLabels = labels(training(cv), :);
 testLabels = labels(test(cv), :);
 
-% Separate normal and anomalous data
+% Separate normal and anomalous data for training
 normalTrainData = trainData(trainLabels == 1, :);
-anomalousTrainData = trainData(trainLabels == 0, :);
-normalTestData = testData(testLabels == 1, :);
-anomalousTestData = testData(testLabels == 0, :);
 
-% Define the Autoencoder
+% Define the Autoencoder structure
 inputSize = size(trainData, 2);
 hiddenSize1 = 32;
 hiddenSize2 = 16;
@@ -46,7 +45,7 @@ autoencoderLayers = [
     decoderLayers
 ];
 
-% Train the autoencoder
+% Training options
 options = trainingOptions('adam', ...
     'MaxEpochs', 20, ...
     'MiniBatchSize', 512, ...
@@ -54,39 +53,60 @@ options = trainingOptions('adam', ...
     'ValidationData', {testData, testData}, ...
     'Plots', 'training-progress');
 
+% Train the Autoencoder
 autoencoder = trainNetwork(normalTrainData, normalTrainData, autoencoderLayers, options);
 
-% Reconstruction Loss for Training Data
-reconstructions = predict(autoencoder, normalTrainData);
-trainLoss = mean(abs(reconstructions - normalTrainData), 2);
+% Calculate Reconstruction Loss for training data
+trainReconstructions = predict(autoencoder, normalTrainData);
+trainLoss = mean(abs(trainReconstructions - normalTrainData), 2);
 
-% Determine Threshold
-threshold = mean(trainLoss) + std(trainLoss);
+% Set thresholds for classification
+thresholdNormal = mean(trainLoss) + std(trainLoss);
+thresholdArrhythmia = mean(trainLoss) + 2 * std(trainLoss);
+thresholdAFib = mean(trainLoss) + 3 * std(trainLoss);
 
-% Visualization of Training Loss
+% Test data predictions and loss calculation
+testReconstructions = predict(autoencoder, testData);
+testLoss = mean(abs(testReconstructions - testData), 2);
+
+% Classification based on thresholds
+classifications = zeros(size(testLoss));
+for i = 1:length(testLoss)
+    if testLoss(i) <= thresholdNormal
+        classifications(i) = 1; % Normal
+    elseif testLoss(i) <= thresholdArrhythmia
+        classifications(i) = 2; % Arrhythmia
+    elseif testLoss(i) <= thresholdAFib
+        classifications(i) = 3; % Atrial Fibrillation
+    else
+        classifications(i) = 4; % Severe anomaly (AV Block)
+    end
+end
+
+% Display classification results
+for i = 1:length(classifications)
+    switch classifications(i)
+        case 1
+            disp(['Sample ' num2str(i) ': Normal']);
+        case 2
+            disp(['Sample ' num2str(i) ': Arrhythmia']);
+        case 3
+            disp(['Sample ' num2str(i) ': Atrial Fibrillation']);
+        case 4
+            disp(['Sample ' num2str(i) ': Severe Anomaly (AV Block)']);
+    end
+end
+
+% Visualize the distribution of reconstruction loss
 figure;
-histogram(trainLoss, 50, 'Normalization', 'pdf');
+histogram(testLoss, 50, 'Normalization', 'pdf', 'FaceColor', 'r');
 hold on;
-xline(mean(trainLoss), 'g--', 'LineWidth', 2, 'Label', 'Mean');
-xline(threshold, 'b--', 'LineWidth', 2, 'Label', 'Threshold');
+xline(mean(testLoss), 'g--', 'LineWidth', 2, 'Label', 'Mean');
+xline(thresholdNormal, 'b--', 'LineWidth', 2, 'Label', 'Normal Threshold');
+xline(thresholdArrhythmia, 'c--', 'LineWidth', 2, 'Label', 'Arrhythmia Threshold');
+xline(thresholdAFib, 'm--', 'LineWidth', 2, 'Label', 'AFib Threshold');
 xlabel('Reconstruction Loss');
 ylabel('Density');
-title('Training Loss Distribution');
-legend('Train Loss', 'Mean', 'Threshold');
-grid on;
-
-% Reconstruction Loss for Anomalous Test Data
-anomalousReconstructions = predict(autoencoder, anomalousTestData);
-anomalousLoss = mean(abs(anomalousReconstructions - anomalousTestData), 2);
-
-% Visualization of Anomalous Loss
-figure;
-histogram(anomalousLoss, 50, 'Normalization', 'pdf', 'FaceColor', 'r');
-hold on;
-xline(mean(anomalousLoss), 'g--', 'LineWidth', 2, 'Label', 'Mean');
-xline(threshold, 'b--', 'LineWidth', 2, 'Label', 'Threshold');
-xlabel('Reconstruction Loss');
-ylabel('Density');
-title('Anomalous Loss Distribution');
-legend('Anomalous Loss', 'Mean', 'Threshold');
+title('Test Loss Distribution and Thresholds');
+legend('Test Loss', 'Mean', 'Normal', 'Arrhythmia', 'AFib');
 grid on;
