@@ -177,8 +177,8 @@ std_RR = std(RR_intervals);
 rmssd = sqrt(mean(diff(RR_intervals).^2)); 
 
 % Define thresholds for irregularities
-regular_threshold = 0.2 * mean_RR; % 20% of mean RR as threshold for "regular irregularity"
-irregular_threshold = 0.5;         % Arbitrary threshold for "irregular irregularity"
+regular_threshold = 0.6 * mean_RR; 
+irregular_threshold = 0.9;         
 
 % Detect irregularities
 if std_RR < regular_threshold
