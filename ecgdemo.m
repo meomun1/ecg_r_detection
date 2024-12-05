@@ -137,3 +137,67 @@ if rangeLimit > 10000
     % Hold off the figure
     hold off
 end
+% Detect the R-peak
+% Bandpass filter (0.5Hz - 50Hz)
+filt_low = 0.5; 
+filt_high = 50;
+[b, a] = butter(2, [filt_low filt_high]/(samplingrate/2), 'bandpass');
+filtered_ecg = filtfilt(b, a, ecg);
+
+% Derivative 
+diff_ecg = diff(filtered_ecg);
+
+squared_ecg = diff_ecg.^2;
+
+% Moving Window Integration
+winSize = floor(0.15 * samplingrate); % 150ms window size
+integrated_ecg = conv(squared_ecg, ones(1, winSize)/winSize, 'same');
+
+% Thresholding to detect R peaks
+threshold = 0.6 * max(integrated_ecg); % 60% of maximum value as threshold
+r_peaks = find(integrated_ecg > threshold);
+
+r_peaks = r_peaks(:);
+
+% Remove closely spaced peaks
+min_dist = 0.2 * samplingrate; % 200ms refractory period
+valid_peaks = r_peaks([true; diff(r_peaks) > min_dist]);
+
+% Display results
+disp('Detected R-Peaks:');
+disp(valid_peaks);
+
+% detect Regular, Regular Irregularity or Irregular Irregularity throw the R-peak
+% Calculate RR intervals 
+RR_intervals = diff(valid_peaks) / samplingrate; % in seconds
+
+% Calculate statistics for RR intervals
+mean_RR = mean(RR_intervals); 
+std_RR = std(RR_intervals);   
+rmssd = sqrt(mean(diff(RR_intervals).^2)); 
+
+% Define thresholds for irregularities
+regular_threshold = 0.6 * mean_RR; 
+irregular_threshold = 0.9;         
+
+% Detect irregularities
+if std_RR < regular_threshold
+    disp('Rhythm is regular.');
+elseif std_RR < irregular_threshold
+    disp('Detected Regular Irregularity (e.g., PVC).');
+else
+    disp('Detected Irregular Irregularity (e.g., Atrial Fibrillation).');
+end
+
+figure;
+scatter(RR_intervals(1:end-1), RR_intervals(2:end), 'filled');
+xlabel('RR Interval n (s)');
+ylabel('RR Interval n+1 (s)');
+title('Poincaré Plot of RR Intervals');
+
+% Optional: Overlay detected R-peaks on original ECG
+figure;
+plot(ecg); hold on;
+stem(valid_peaks, ecg(valid_peaks), 'r');
+title('ECG Signal with Detected R-Peaks');
+xlabel('Sample'); ylabel('Amplitude');
