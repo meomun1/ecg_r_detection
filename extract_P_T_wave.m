@@ -28,14 +28,14 @@ function [P_wave, T_wave] = extract_P_T_wave(ecg_signal, R_peaks, mean_RR, fs, r
     end
 
     % Plot the P and T waves
-    figure;
+figure;
 
-    figure(4); set(4, 'Name', 'P detection');
-    subplot(2, 1, 1); plot((P_wave(1:rangeLimit)-min(P_wave(1:rangeLimit)))/(max(P_wave(1:rangeLimit))-min(P_wave(1:rangeLimit))));
-    title('\bf7. P wave detection'); ylim([-0.2 1.2]);
+figure(4); set(4, 'Name', 'P detection');
+subplot(2, 1, 1); plot(P_wave(1:rangeLimit));
+title('\bf7. P wave detection'); ylim([min(P_wave(1:rangeLimit))-0.2, max(P_wave(1:rangeLimit))+0.2]);
 
-    figure(5); set(5, 'Name', 'T detection');
-    subplot(2, 1, 1); plot((T_wave(1:rangeLimit)-min(T_wave(1:rangeLimit)))/(max(T_wave(1:rangeLimit))-min(T_wave(1:rangeLimit))));
-    title('\bf8. T wave detection'); ylim([-0.2 1.2]);
+figure(5); set(5, 'Name', 'T detection');
+subplot(2, 1, 1); plot(T_wave(1:rangeLimit));
+title('\bf8. T wave detection'); ylim([min(T_wave(1:rangeLimit))-0.2, max(T_wave(1:rangeLimit))+0.2]);
 
 end
