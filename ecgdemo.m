@@ -137,50 +137,75 @@ if rangeLimit > 10000
     % Hold off the figure
     hold off
 end
-% Detect the R-peak
+% Detect R-peak
 % Bandpass filter (0.5Hz - 50Hz)
 filt_low = 0.5; 
-filt_high = 50;
-[b, a] = butter(2, [filt_low filt_high]/(samplingrate/2), 'bandpass');
+filt_high = 40;
+[b, a] = butter(2, [filt_low filt_high] / (samplingrate / 2), 'bandpass');
 filtered_ecg = filtfilt(b, a, ecg);
 
 % Derivative 
 diff_ecg = diff(filtered_ecg);
 
-squared_ecg = diff_ecg.^2;
+% Squaring the signal
+squared_ecg = diff_ecg .^ 2;
 
 % Moving Window Integration
-winSize = floor(0.15 * samplingrate); % 150ms window size
-integrated_ecg = conv(squared_ecg, ones(1, winSize)/winSize, 'same');
+winSize = floor(0.15 * samplingrate); 
+integrated_ecg = conv(squared_ecg, ones(1, winSize) / winSize, 'same');
 
 % Thresholding to detect R peaks
-threshold = 0.6 * max(integrated_ecg); % 60% of maximum value as threshold
+threshold = median(integrated_ecg) + 0.4 * std(integrated_ecg); % Adaptive threshold based on median and std
 r_peaks = find(integrated_ecg > threshold);
 
+% Ensure r_peaks is a column vector
 r_peaks = r_peaks(:);
 
-% Remove closely spaced peaks
-min_dist = 0.2 * samplingrate; % 200ms refractory period
+% Remove closely spaced peaks (Refractory period handling)
+min_dist = 0.2 * samplingrate; 
 valid_peaks = r_peaks([true; diff(r_peaks) > min_dist]);
 
-% Display results
+% Refine detected R-peaks to align with actual signal peaks
+refined_peaks = [];
+search_window = round(0.25 * samplingrate); 
+for i = 1:length(valid_peaks)
+    % Define a local search window around each detected peak
+    peak_range = max(1, valid_peaks(i) - search_window):min(length(filtered_ecg), valid_peaks(i) + search_window);
+    
+    % Find the maximum point within the filtered ECG signal
+    [~, local_max_idx_filtered] = max(filtered_ecg(peak_range));
+    
+    % Align to the original ECG signal
+    peak_range_original = max(1, peak_range(local_max_idx_filtered) - search_window):min(length(ecg), peak_range(local_max_idx_filtered) + search_window);
+    [~, local_max_idx_original] = max(ecg(peak_range_original));
+    
+    % Save the global index of the refined peak
+    refined_peaks = [refined_peaks; peak_range_original(local_max_idx_original)];
+end
+valid_peaks = refined_peaks;
+
+% Display detected R-peaks
 disp('Detected R-Peaks:');
 disp(valid_peaks);
 
-% detect Regular, Regular Irregularity or Irregular Irregularity throw the R-peak
 % Calculate RR intervals 
 RR_intervals = diff(valid_peaks) / samplingrate; % in seconds
 
 % Calculate statistics for RR intervals
 mean_RR = mean(RR_intervals); 
 std_RR = std(RR_intervals);   
-rmssd = sqrt(mean(diff(RR_intervals).^2)); 
+rmssd = sqrt(mean(diff(RR_intervals) .^ 2)); 
 
-% Define thresholds for irregularities
+% Display metrics
+fprintf('Mean RR Interval: %.3f s\n', mean_RR);
+fprintf('Standard Deviation of RR Intervals: %.3f s\n', std_RR);
+fprintf('RMSSD: %.3f s\n', rmssd);
+
+% Define thresholds for rhythm irregularities
 regular_threshold = 0.6 * mean_RR; 
 irregular_threshold = 0.9;         
 
-% Detect irregularities
+% Detect rhythm regularity
 if std_RR < regular_threshold
     disp('Rhythm is regular.');
 elseif std_RR < irregular_threshold
@@ -189,15 +214,18 @@ else
     disp('Detected Irregular Irregularity (e.g., Atrial Fibrillation).');
 end
 
+% Poincaré plot visualization
 figure;
 scatter(RR_intervals(1:end-1), RR_intervals(2:end), 'filled');
 xlabel('RR Interval n (s)');
 ylabel('RR Interval n+1 (s)');
 title('Poincaré Plot of RR Intervals');
 
-% Optional: Overlay detected R-peaks on original ECG
+% Overlay detected R-peaks on original ECG
 figure;
-plot(ecg); hold on;
-stem(valid_peaks, ecg(valid_peaks), 'r');
+plot(ecg, '-b'); hold on;
+stem(valid_peaks, ecg(valid_peaks), 'or', 'LineWidth', 1.5);
 title('ECG Signal with Detected R-Peaks');
-xlabel('Sample'); ylabel('Amplitude');
+xlabel('Sample');
+ylabel('Amplitude');
+legend('ECG Signal', 'Detected R-Peaks');
